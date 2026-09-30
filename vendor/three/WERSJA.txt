@@ -1,0 +1,14 @@
+three.js 0.180.0, licencja MIT (plik LICENSE obok)
+
+Paczka: https://registry.npmjs.org/three/-/three-0.180.0.tgz
+Metadane: https://registry.npmjs.org/three/0.180.0
+sha512 paczki: sha512-o+qycAMZrh+TsE01GqWUxUIKR1AL0S8pq7zDkYOQw8GqfX8b8VoCKYUoHbhiX5j+7hr8XsuHDVU6+gkQJQKg9w==
+(zgodne z dist.integrity w metadanych; sha1 b930cabfb524f6d36bf63e874b4d866888b50487 zgodne z dist.shasum)
+
+Pliki skopiowane z paczki bez zmian:
+three.module.min.js  z build/three.module.min.js  338908 B  sha256 e2b5ee6bccd38fd6d8a2428546b83c5f2426d84b152ef82be8055556e3b40eb6
+three.core.min.js    z build/three.core.min.js    381124 B  sha256 61ba0df005b05991361d040d8ff670e1aadfd0ce7aeebd1fdb0725957a8957de
+LICENSE              z LICENSE                    1081 B    sha256 bfe119ea4fd413f5f7ca3fcd63adb0c4a073ed39daa2fe7d3e6b769e21272601
+
+three.module.min.js importuje tylko ./three.core.min.js.
+Pobrano 2026-09-29 (curl, tar, shasum; bez npm).

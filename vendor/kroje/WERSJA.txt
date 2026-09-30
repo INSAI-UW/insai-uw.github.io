@@ -1,0 +1,47 @@
+Kroje strony (vendor/kroje), stan z 29.09.2026, uzupełniony 30.09.2026
+
+Pliki
+  insai-serif-opsz-wght.woff2  87496 B  sha256 b8c7beb417f259c8b842a7e1aaf56b89958b3525a5b452f62a1bca8e2c21d06a
+  insai-mono-400.woff2         10252 B  sha256 851f8b0d246e4bcbdb0ce2a12b39c3beb1fbad57cf828651505555dde574ea5f
+  insai-mono-500.woff2         10460 B  sha256 208db45cf843919714463f6bbdc7cbccd120f687b4a7a2c0b39cb34894bdde06
+  OFL-SourceSerif4.txt  licencja i nota autorska Source Serif 4 (plik LICENSE.md z adobe-fonts/source-serif, bez zmian)
+  OFL-IBMPlexMono.txt   licencja i nota autorska IBM Plex Mono (plik LICENSE.txt z IBM/plex, bez zmian)
+
+INSAI Serif: wersja zmieniona kroju Source Serif 4
+  Autor: Adobe (projekt Frank Grießhammer). Nota autorska w pliku kroju:
+  „© 2014 - 2021 Adobe Systems Incorporated (http://www.adobe.com/), with Reserved Font Name ‘Source’.”
+  Źródło: google/fonts, commit 7b203a635ebe80801c80f29633d4fc467cd1214e, plik ofl/sourceserif4/SourceSerif4[opsz,wght].ttf,
+  wersja 4.004 (ta sama, z której Google Fonts serwowało stronie podzbiór), sha256
+  97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b.
+  Zmiany: podzbiór 148 znaków (alfabet polski i interpunkcja strony, jak w dotychczasowym parametrze text= Google Fonts,
+  oraz „=” i „©” dodane 30.09.2026 dla nowych tekstów strony),
+  cechy ccmp, dnom, frac, liga, locl, numr, pnum, tnum, kern, mark, mkmk, pełne osie opsz 8..60 i wght 200..900,
+  hinting TrueType ze źródła, format WOFF2; nazwa kroju zmieniona na „INSAI Serif”.
+
+INSAI Mono: wersja zmieniona kroju IBM Plex Mono (grubości 400 i 500)
+  Autor: IBM (projekt Mike Abbink, Bold Monday). Nota autorska w pliku kroju: „Copyright 2017 IBM Corp. All rights reserved.”;
+  w licencji: „Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"”.
+  Źródło: google/fonts, commit 633f3200539c52ee0aba2dfd7f46921417a81877, pliki ofl/ibmplexmono/IBMPlexMono-Regular.ttf
+  (sha256 6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46) i IBMPlexMono-Medium.ttf
+  (sha256 a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755), wersja 2.3.
+  Zmiany: podzbiór 140 znaków (ten sam zakres), cechy ccmp, dnom, frac, numr, mark, hinting TrueType ze źródła, format WOFF2; nazwa kroju
+  zmieniona na „INSAI Mono”.
+
+Licencja
+  Oba kroje i ich wersje zmienione są na licencji SIL Open Font License 1.1 (pełny tekst w plikach OFL-*.txt).
+  Podzbiór jest wersją zmienioną (OFL, definicja „Modified Version”; OFL FAQ 2.6: „Removing any parts of the font when
+  delivering a webfont to a browser, including unused glyphs and smart font code, is considered modification.”).
+  Warunek 3 OFL zabrania wersji zmienionej używać nazw zastrzeżonych („Source”, „Plex”) bez pisemnej zgody właściciela,
+  dlatego nazwy kroju (nameID 1, 3, 4, 6, 16, 25 i nazwy PostScript instancji) zmieniono na „INSAI Serif” i „INSAI Mono”.
+  Noty autorskie (nameID 0) i informacje o znakach towarowych (nameID 7) zostały bez zmian. Nazwy autorów i właścicieli
+  nie służą promocji tej strony (warunek 4 OFL).
+
+Zgodność z dotychczasowym wyglądem
+  Kontury, szerokości znaków, cechy OpenType i instrukcje hintingu są identyczne z plikami, które Google Fonts
+  serwował stronie dla Windows i Linuxa (dla macOS, iOS i Androida Google podawał ten sam krój bez hintingu).
+  Wyjątek z 30.09.2026: znaki „=” (adresy łączy w wydruku) i „©” (wiersz praw w stopce) nie należały do podzbioru
+  i rysował je krój zapasowy; od tej wersji rysują je kroje strony. Glify i szerokości pozostałych znaków bez zmian.
+
+Odtworzenie
+  Skrypt kroje.py w katalogu narzędzi repozytorium (fontTools 4.61.1 z brotli) pobiera źródła z podanych commitów,
+  sprawdza ich sha256 i zapisuje te trzy pliki WOFF2 bajt w bajt.
