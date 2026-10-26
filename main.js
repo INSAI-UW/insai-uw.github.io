@@ -733,6 +733,14 @@ mqRM.addEventListener('change', () => {
 mqTouch.addEventListener('change', showButtons);
 mqDesk.addEventListener('change', () => { showButtons(); if (mqDesk.matches) { startNet(); loadLenis(); } else { killLenis(); root.classList.remove('net-on'); stage.style.transform = ''; title2.forEach((l) => (l.style.transform = '')); redrawPlates(); } dirty = true; schedule(); });
 
+// ---------- karta naboru: wejście raz, przy pierwszym pokazaniu w oknie ----------
+// Klasa „in” zostaje do końca wizyty. Bez ruchu styl pokazuje od razu stan końcowy.
+const nabor = $('#plany .nabor');
+if (nabor && 'IntersectionObserver' in window) {
+  const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { nabor.classList.add('in'); io.disconnect(); } }, { threshold: 0.3 });
+  io.observe(nabor);
+} else if (nabor) nabor.classList.add('in');
+
 // ---------- start ----------
 showButtons();
 plates.forEach((f) => plateIO.observe(f));
