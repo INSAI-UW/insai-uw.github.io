@@ -98,6 +98,26 @@ const segs = secs.map(() => prog.appendChild(document.createElement('s')));
 const items = secs.map((s) => menuLinks.find((a) => a.hash === '#' + s.id)?.parentElement);
 const two = (n) => String(n).padStart(2, '0');
 let isPinned = false, currentSectionId = null, lastF = '';
+// Skok do kotwicy: do pierwszej czynności czytelnika etykieta pokazuje sekcję, do której należy cel. Blokadę zakłada
+// kliknięcie łącza „#…”, wejście z adresem z „#” i zmiana „#” (wstecz, dalej); zdejmuje ją kółko, przesunięcie palcem,
+// klawisze przewijania i chwycenie paska przewijania. Przewijanie programowe (Lenis, skok natywny) jej nie zdejmuje.
+// Blokada działa, gdy cel jest w oknie; gdy był w oknie i z niego wyszedł, znika. Po przywróceniu innej pozycji
+// (wstecz, odświeżenie) cel nie jest w oknie, więc etykieta idzie zwykłą logiką.
+let pinEl = null, pinSeen = false;
+function pinTo(id) {
+  let el = null;
+  try { el = id ? document.getElementById(decodeURIComponent(id)) : null; } catch (e) { el = null; }
+  pinEl = el && secs.some((s) => s.contains(el)) ? el : null;
+  pinSeen = false;
+}
+function pinnedIndex() {
+  if (!pinEl) return -1;
+  const r = pinEl.getBoundingClientRect();
+  if (r.bottom <= topBar() || r.top >= innerHeight) { if (pinSeen) pinEl = null; return -1; }
+  pinSeen = true;
+  return secs.findIndex((s) => s.contains(pinEl));
+}
+function unpin() { if (pinEl) { pinEl = null; orientation(); } }
 function topBar() {   // dolna krawędź paska przy górnej krawędzi okna; na pulpicie indeks stoi z boku, więc 0
   const r = paginaIn.getBoundingClientRect();
   // pasek stoi w przepływie pod okładką i przykleja się dopiero przy sekcji 01
@@ -122,11 +142,13 @@ function orientation() {
   tops.forEach((t, i) => { if (t <= line) ci = i; });
   const atEnd = secs.length && innerHeight + scrollY >= root.scrollHeight - 2;
   if (atEnd) ci = secs.length - 1;
+  const pi = pinnedIndex(), full = atEnd && pi < 0;
+  if (pi >= 0) ci = pi;
   const current = ci < 0 ? null : secs[ci];
   // postęp w obrębie każdej sekcji: odcinki paska (telefon) i włosowa oś indeksu (pulpit)
   const n = secs.length;
   const f = tops.map((t, i) => {
-    if (atEnd || i < ci) return 1;
+    if (full || i < ci) return 1;
     if (i > ci) return 0;
     const end = i + 1 < n ? tops[i + 1] : secs[i].getBoundingClientRect().bottom;
     return Math.min(1, Math.max(0, (line - t) / Math.max(1, end - t)));
@@ -230,6 +252,49 @@ const BLOK_PAD = 32, BLOK_BLUR = 11;   // zapas i rozmycie w px, rozdzielczość
 // od końca każdego wiersza krycie sieci <= 0,35, pierwszy w pełni widoczny węzeł >= 48 px od ostatniej litery
 const SOFT_PAD = 96, SOFT_BLUR = 30;
 let HALO_R = [];   // otwory maski w układzie dokumentu: [l, t, r, b, zapas z rozmyciem] (netApi.free)
+// Safari nie stosuje ctx.filter na kanwie 2D, więc brzegi otworów maski są tam ostre. canvasFilterOK sprawdza zachowanie:
+// rozmyty punkt musi dać krycie obok punktu. Sam odczyt ctx.filter nie wystarcza, bo bez obsługi filtra przypisanie
+// tworzy zwykłą właściwość obiektu. Wynik liczony raz.
+function canvasFilterOK() {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 9;
+    const g = c.getContext('2d'); g.filter = 'blur(2px)'; g.fillRect(4, 4, 1, 1);
+    return g.getImageData(2, 4, 1, 1).data[3] > 0;
+  } catch (e) { return false; }
+}
+const FILTER_OK = !(DEV && DEV.nofilter) && canvasFilterOK();
+// Rozmycie zapasowe bez ctx.filter: trzy rozmycia pudełkowe, każde poziomo i potem pionowo, przybliżają rozmycie Gaussa
+// o odchyleniu sigma (px kanwy). Zmienia tylko kanał alfa. Poza kanwą krycie jest 0, jak przy ctx.filter.
+// box [x0, y0, x1, y1]: obszar z kształtami; rozmycie biegnie w nim z zapasem równym zasięgowi pudełek, więc wynik jest
+// ten sam co dla całej kanwy.
+function blurAlpha(ctx, sigma, box) {
+  const wi = Math.sqrt(4 * sigma * sigma + 1);
+  let wl = Math.floor(wi); if (wl % 2 === 0) wl--;
+  const mb = Math.round((12 * sigma * sigma - 3 * wl * wl - 12 * wl - 9) / (-4 * wl - 4));
+  const rs = [0, 1, 2].map((i) => ((i < mb ? wl : wl + 2) - 1) >> 1), pad = rs[0] + rs[1] + rs[2] + 1;
+  const cw = ctx.canvas.width, ch = ctx.canvas.height, b = box || [0, 0, cw, ch];
+  const x0 = Math.max(0, Math.floor(b[0]) - pad), y0 = Math.max(0, Math.floor(b[1]) - pad);
+  const w = Math.min(cw, Math.ceil(b[2]) + pad) - x0, h = Math.min(ch, Math.ceil(b[3]) + pad) - y0;
+  if (!(w > 0 && h > 0)) return;
+  const img = ctx.getImageData(x0, y0, w, h), d = img.data, a = new Float32Array(w * h), t = new Float32Array(w * h);
+  for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+  // jedno przejście: średnia z okna 2r + 1 wzdłuż każdej linii (len próbek co st, linie co ls)
+  const pass = (src, dst, len, lines, st, ls, r) => {
+    const inv = 1 / (2 * r + 1);
+    for (let l = 0; l < lines; l++) {
+      const o = l * ls; let acc = 0;
+      for (let i = 0; i <= r && i < len; i++) acc += src[o + i * st];
+      for (let i = 0; i < len; i++) {
+        dst[o + i * st] = acc * inv;
+        if (i + r + 1 < len) acc += src[o + (i + r + 1) * st];
+        if (i - r >= 0) acc -= src[o + (i - r) * st];
+      }
+    }
+  };
+  for (const r of rs) { pass(a, t, w, h, 1, w, r); pass(t, a, h, w, w, 1, r); }
+  for (let i = 0; i < a.length; i++) d[i * 4 + 3] = a[i];
+  ctx.putImageData(img, x0, y0);
+}
 function halos() {
   if (!veil || !canvas || !mqDesk.matches) return;
   if (canvas.parentNode !== veil) veil.prepend(canvas);
@@ -237,7 +302,7 @@ function halos() {
   let soft = false, blok = false;
   const add = (l, t, r, b) => { if (r - l > 0.5 && b - t > 0.5) (blok ? RG : soft ? RS : R).push([l + sx, t + sy, r + sx, b + sy]); };
   const shiftOf = (el) => { const t = getComputedStyle(el).transform; return t && t !== 'none' ? new DOMMatrixReadOnly(t) : null; };
-  for (const box of $$('.hero-main, .hero .docline, main')) {
+  for (const box of $$('.hero-main, main')) {
     const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, { acceptNode: (n) => n.data.trim() && !n.parentElement.closest('script, style, [hidden]') ? 1 : 3 });
     for (let n; (n = walk.nextNode());) {
       const rg = document.createRange(); rg.selectNodeContents(n);
@@ -283,15 +348,21 @@ function halos() {
   const hc = document.createElement('canvas'), mc = document.createElement('canvas');
   hc.width = mc.width = Math.ceil(W * k); hc.height = mc.height = Math.ceil(H * k);
   const h = hc.getContext('2d'), m = mc.getContext('2d');
+  // cut: otwory z kanwy c wycięte z maski z miękkim brzegiem sigma; bez ctx.filter (Safari) rozmycie zapasowe w obszarze box
+  const cut = (c, g, sigma, box) => {
+    if (FILTER_OK) { m.filter = `blur(${sigma}px)`; m.drawImage(c, 0, 0); m.filter = 'none'; } else { blurAlpha(g, sigma, box); m.drawImage(c, 0, 0); }
+  };
+  // bbox: obszar prostokątów L z zapasem pad, w px kanwy maski
+  const bbox = (L, pad) => L.reduce((q, [l, t, r, b]) => [Math.min(q[0], (l - pad) * k), Math.min(q[1], (t - pad) * k), Math.max(q[2], (r + pad) * k), Math.max(q[3], (b + pad) * k)], [Infinity, Infinity, -Infinity, -Infinity]);
   h.fillStyle = '#000';
   for (const [l, t, r, b] of R) { h.beginPath(); h.roundRect((l - HALO_PAD) * k, (t - HALO_PAD) * k, (r - l + 2 * HALO_PAD) * k, (b - t + 2 * HALO_PAD) * k, 12 * k); h.fill(); }
   m.fillStyle = '#000'; m.fillRect(0, 0, mc.width, mc.height);
-  m.globalCompositeOperation = 'destination-out'; m.filter = `blur(${HALO_BLUR * k}px)`; m.drawImage(hc, 0, 0);
+  m.globalCompositeOperation = 'destination-out'; cut(hc, h, HALO_BLUR * k, bbox(R, HALO_PAD));
   if (RS.length) {   // tytuł i zdanie wstępne: szerszy zapas i miękki brzeg
     const hs = document.createElement('canvas'); hs.width = hc.width; hs.height = hc.height;
     const g = hs.getContext('2d'); g.fillStyle = '#000';
     for (const [l, t, r, b] of RS) { g.beginPath(); g.roundRect((l - SOFT_PAD) * k, (t - SOFT_PAD) * k, (r - l + 2 * SOFT_PAD) * k, (b - t + 2 * SOFT_PAD) * k, 48 * k); g.fill(); }
-    m.filter = `blur(${SOFT_BLUR * k}px)`; m.drawImage(hs, 0, 0);
+    cut(hs, g, SOFT_BLUR * k, bbox(RS, SOFT_PAD));
   }
   // bloki wycięte, ta sama rampa ze wszystkich czterech stron każdego bloku: pełne krycie sceny dopiero >= 48 px od
   // najbliższej litery (BLOK_PAD, rozmycie BLOK_BLUR); jeden obraz dla wszystkich
@@ -301,7 +372,7 @@ function halos() {
     const sh = document.createElement('canvas'); sh.width = hc.width; sh.height = hc.height;
     const s2 = sh.getContext('2d'); s2.fillStyle = '#000';
     for (const [l, t, r, b] of GB) { s2.beginPath(); s2.roundRect((l - BLOK_PAD) * k, (t - BLOK_PAD) * k, (r - l + 2 * BLOK_PAD) * k, (b - t + 2 * BLOK_PAD) * k, 12 * k); s2.fill(); }
-    m.filter = `blur(${BLOK_BLUR * k}px)`; m.drawImage(sh, 0, 0); m.filter = 'none';
+    cut(sh, s2, BLOK_BLUR * k, bbox(GB, BLOK_PAD));
     // wycięcie: w bloku i piksel maski wokół niego krycie dokładnie 0 (rozmyty brzeg zostawia tam ok. 0,5 %, a skalowanie
     // maski rozlewa go o piksel maski w głąb bloku)
     for (const [l, t, r, b] of GB) { const x0 = Math.floor(l * k) - 1, y0 = Math.floor(t * k) - 1; m.fillRect(x0, y0, Math.ceil(r * k) + 1 - x0, Math.ceil(b * k) + 1 - y0); }
@@ -543,10 +614,12 @@ async function startNet() {
 }
 
 // ---------- Lenis ze strażnikiem ruchu: tylko pulpit z myszą, tylko przy ruchu ----------
+// LENIS_OPTS: jedyne opcje Lenisa (wariant C: czas 1,2 s, wygaszanie sześcienne).
+const LENIS_OPTS = { duration: 1.2, easing: (t) => 1 - Math.pow(1 - t, 3), smoothWheel: true, syncTouch: false };
 let lenis = null;
 function loadLenis() {
   if (lenis || !moving() || !mqDesk.matches || !mqFine.matches) return;
-  const go = () => { if (!lenis && moving() && window.Lenis) { lenis = new window.Lenis({ autoRaf: false, lerp: 0.1, wheelMultiplier: 1, smoothWheel: true, syncTouch: false }); schedule(); } };
+  const go = () => { if (!lenis && moving() && window.Lenis) { lenis = new window.Lenis({ autoRaf: false, ...LENIS_OPTS }); schedule(); } };
   if (window.Lenis) return go();
   if (!$('link[data-lenis]')) {
     const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = new URL('./vendor/lenis.css', import.meta.url); css.dataset.lenis = '1'; document.head.appendChild(css);
@@ -563,28 +636,47 @@ document.addEventListener('click', (ev) => {
   const target = id && document.getElementById(id);
   if (!target) return;
   const focusEl = target.querySelector('h1[tabindex], h2[tabindex]') || target;
+  pinTo(id);
   if (lenis && ev.detail !== 0) {
     ev.preventDefault();
-    lenis.scrollTo(target, { offset: -(topBar() + 20), duration: 1.1, onComplete: () => focusEl.focus({ preventScroll: true }) });
+    lenis.scrollTo(target, { offset: -(topBar() + 20), duration: 1.1, onComplete: () => { focusEl.focus({ preventScroll: true }); orientation(); } });
     history.replaceState(null, '', '#' + id);
   } else {
-    setTimeout(() => focusEl.focus({ preventScroll: true }), 0);
+    setTimeout(() => { focusEl.focus({ preventScroll: true }); orientation(); }, 0);
   }
 });
+if (location.hash) { pinTo(location.hash.slice(1)); orientation(); }
+addEventListener('hashchange', () => { pinTo(location.hash.slice(1)); orientation(); });
+addEventListener('wheel', unpin, { passive: true });
+addEventListener('touchmove', unpin, { passive: true });
+addEventListener('keydown', (e) => {
+  if (!['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(e.key) || e.defaultPrevented) return;
+  if (e.key === ' ' && e.target.closest?.('button, summary')) return;   // spacja na kontrolce ją uruchamia, nie przewija
+  unpin();
+});
+addEventListener('pointerdown', (e) => { if (e.target === root && e.clientX >= root.clientWidth) unpin(); });   // pasek przewijania
 
 // ---------- jedna pętla klatek: Lenis + sieć; zasypia, gdy nic się nie dzieje ----------
+// damp: wygładzanie w czasie (dt i stała czasu tau w s), więc kursor i soczewka biegną tak samo przy 60 i 120 Hz.
+const damp = (cur, target, dt, tau) => target + (cur - target) * Math.exp(-dt / tau);
+const TAU_POINTER = 0.2, TAU_LENS = 0.27;   // przy 60 Hz równe dawnym krokom 0,08 i 0,06 na klatkę
+// Zegar Lenisa. Lenis liczy krok z czasu od poprzedniej klatki. Po uśpieniu pętli ten czas to sekundy, więc pierwszy
+// ruch kółka doskoczyłby do celu w jednej klatce. Zegar rośnie najwyżej o LENIS_DT_MAX ms na klatkę, a pierwsza klatka
+// po uśpieniu liczy 1/60 s.
+const LENIS_DT_MAX = 100;
+let lenisT = 0, lenisPrev = 0;
 function tick(now) {
   raf = 0;
   running = false;
   if (document.hidden) return;
-  if (lenis) lenis.raf(now);
+  if (lenis) { lenisT += lenisPrev ? Math.min(now - lenisPrev, LENIS_DT_MAX) : 1000 / 60; lenisPrev = now; lenis.raf(lenisT); }
   meter();
   let again = !!(lenis && lenis.isScrolling);
   if (scene && inView && !document.hidden && root.classList.contains('net-on')) {
     const dp = Math.abs(pTarget[0] - pointer[0]) + Math.abs(pTarget[1] - pointer[1]) + Math.abs(lensTarget - lens);
-    pointer[0] += (pTarget[0] - pointer[0]) * 0.08; pointer[1] += (pTarget[1] - pointer[1]) * 0.08; lens += (lensTarget - lens) * 0.06;
-    // Wygaszenie liczone w czasie, nie w liczbie klatek.
+    // Kursor, soczewka i wygaszenie liczone w czasie, nie w liczbie klatek.
     const idleS = (now - lastAct) / 1000, dt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0.016; lastFrame = now;
+    pointer[0] = damp(pointer[0], pTarget[0], dt, TAU_POINTER); pointer[1] = damp(pointer[1], pTarget[1], dt, TAU_POINTER); lens = damp(lens, lensTarget, dt, TAU_LENS);
     const want = idleS > IDLE_AFTER_S ? 0 : 1;
     driftAmp += (want - driftAmp) * (1 - Math.exp(-dt / 0.18)); if (Math.abs(want - driftAmp) < 0.01) driftAmp = want;
     const st = frameState(now);
@@ -594,11 +686,13 @@ function tick(now) {
     } else {
       const continuous = st.intro < 1 || st.drift > 0.001 || st.couple > 0 || (st.lens > 0 && (dp > 0.002 || st.lensGate < 0.999));
       if (continuous || dirty) (scene.render(st), sceneDrawn = true);
-      again = again || continuous;
+      // pętla czuwa, aż kursor i soczewka dojdą do celu (granica 1e-3); tylko przy ruchu, bo bez ruchu schedule() woła tick() wprost
+      const settling = Math.abs(lensTarget - lens) > 1e-3 || Math.abs(pTarget[0] - pointer[0]) > 1e-3 || Math.abs(pTarget[1] - pointer[1]) > 1e-3;
+      again = again || continuous || (moving() && settling);
     }
   }
   dirty = false;
-  if (again) schedule(); else lastFrame = 0;
+  if (again) schedule(); else { lastFrame = 0; lenisPrev = 0; }
 }
 function schedule() {
   if (DEV || running || document.hidden) return;
@@ -607,6 +701,12 @@ function schedule() {
 }
 const act = () => { lastAct = performance.now(); schedule(); };
 addEventListener('scroll', () => { dirty = true; act(); }, { passive: true });
+// Etykieta bieżącej sekcji po końcu przewijania: zdarzenie scrollend, a bez niego 120 ms po ostatnim zdarzeniu scroll.
+// Układ może się zmienić po ostatnim zdarzeniu scroll (spis zwija się po kliknięciu), więc orientation() biegnie jeszcze raz.
+let scrollEndT = 0;
+const settled = () => { clearTimeout(scrollEndT); scrollEndT = 0; orientation(); };
+if ('onscrollend' in window) addEventListener('scrollend', settled, { passive: true });
+else addEventListener('scroll', () => { clearTimeout(scrollEndT); scrollEndT = setTimeout(settled, 120); }, { passive: true });
 addEventListener('wheel', act, { passive: true });
 addEventListener('keydown', (e) => { if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(e.key)) act(); });
 addEventListener('touchstart', act, { passive: true });
@@ -618,7 +718,7 @@ addEventListener('pointermove', (e) => {
 }, { passive: true });
 document.addEventListener('pointerleave', () => { lensTarget = 0; schedule(); });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { cancelAnimationFrame(raf); raf = 0; running = false; lastFrame = 0; }
+  if (document.hidden) { cancelAnimationFrame(raf); raf = 0; running = false; lastFrame = 0; lenisPrev = 0; }
   else { dirty = true; schedule(); }
 });
 // scena stoi, gdy granatowa okładka zasłania cały ekran (ani pierwszy ekran, ani treść nie są w widoku)
@@ -686,19 +786,21 @@ cover.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') co
 // Przycisk istnieje tylko przy dostępnym schowku; bez niego zostaje sam odnośnik mailto.
 $$('[data-copy]').forEach((b) => {
   if (!navigator.clipboard || !window.isSecureContext) return;
-  const label = b.textContent, st = b.nextElementSibling;
+  // mikroteksty z atrybutów przycisku (aneks mikrotekstów): data-copied po zapisie, data-copy-fail po odmowie schowka
+  const label = b.textContent, st = b.nextElementSibling, done = b.dataset.copied, fail = b.dataset.copyFail;
   let back = 0;
   b.hidden = false;
   b.addEventListener('click', async () => {
+    clearTimeout(back);
     try {
       await navigator.clipboard.writeText(b.dataset.copy);
-      b.textContent = 'Skopiowano'; b.classList.add('ok'); if (st) st.textContent = 'Skopiowano';
-      clearTimeout(back);
-      back = setTimeout(() => { b.textContent = label; b.classList.remove('ok'); if (st) st.textContent = ''; }, 2000);
-    } catch (e) {   // odmowa schowka: zaznacz adres, żeby wystarczyło Ctrl+C
+      if (done) { b.textContent = done; b.classList.add('ok'); if (st) st.textContent = done; }
+    } catch (e) {   // odmowa schowka: zaznacz adres, żeby wystarczyło Ctrl+C, i ogłoś komunikat w regionie stanu
       const a = cover.querySelector('a[href^="mailto:"]');
       if (a) { const rg = document.createRange(); rg.selectNodeContents(a); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); }
+      if (fail && st) st.textContent = fail;
     }
+    back = setTimeout(() => { b.textContent = label; b.classList.remove('ok'); if (st) st.textContent = ''; }, 2000);
   });
 });
 

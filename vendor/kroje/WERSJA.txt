@@ -1,9 +1,9 @@
-Kroje strony (vendor/kroje), stan z 29.09.2026, uzupełniony 30.09.2026
+Kroje strony (vendor/kroje), stan z 29.09.2026, uzupełniony 30.09.2026 i 28.10.2026
 
 Pliki
-  insai-serif-opsz-wght.woff2  87496 B  sha256 b8c7beb417f259c8b842a7e1aaf56b89958b3525a5b452f62a1bca8e2c21d06a
-  insai-mono-400.woff2         10252 B  sha256 851f8b0d246e4bcbdb0ce2a12b39c3beb1fbad57cf828651505555dde574ea5f
-  insai-mono-500.woff2         10460 B  sha256 208db45cf843919714463f6bbdc7cbccd120f687b4a7a2c0b39cb34894bdde06
+  insai-serif-opsz-wght.woff2  87568 B  sha256 67c55e2c82d794cc3355d5a5d3710b3dd95b98aac83f9ed25b2b7bcae3d8b4a2
+  insai-mono-400.woff2         10304 B  sha256 705990213eb68822c8a4639954ad96371f4a33543794d638cd29cbe47b1447a3
+  insai-mono-500.woff2         10524 B  sha256 3dcfd9a614a08b60872607ddb568b126f886b4bacb42bd1561908fb87bcf75a7
   OFL-SourceSerif4.txt  licencja i nota autorska Source Serif 4 (plik LICENSE.md z adobe-fonts/source-serif, bez zmian)
   OFL-IBMPlexMono.txt   licencja i nota autorska IBM Plex Mono (plik LICENSE.txt z IBM/plex, bez zmian)
 
@@ -13,8 +13,8 @@ INSAI Serif: wersja zmieniona kroju Source Serif 4
   Źródło: google/fonts, commit 7b203a635ebe80801c80f29633d4fc467cd1214e, plik ofl/sourceserif4/SourceSerif4[opsz,wght].ttf,
   wersja 4.004 (ta sama, z której Google Fonts serwowało stronie podzbiór), sha256
   97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b.
-  Zmiany: podzbiór 148 znaków (alfabet polski i interpunkcja strony, jak w dotychczasowym parametrze text= Google Fonts,
-  oraz „=” i „©” dodane 30.09.2026 dla nowych tekstów strony),
+  Zmiany: podzbiór 151 znaków (alfabet polski i interpunkcja strony, jak w dotychczasowym parametrze text= Google Fonts,
+  „=” i „©” dodane 30.09.2026 dla nowych tekstów strony oraz „‘”, „’” i „“” dodane 28.10.2026 dla wersji angielskiej),
   cechy ccmp, dnom, frac, liga, locl, numr, pnum, tnum, kern, mark, mkmk, pełne osie opsz 8..60 i wght 200..900,
   hinting TrueType ze źródła, format WOFF2; nazwa kroju zmieniona na „INSAI Serif”.
 
@@ -24,7 +24,7 @@ INSAI Mono: wersja zmieniona kroju IBM Plex Mono (grubości 400 i 500)
   Źródło: google/fonts, commit 633f3200539c52ee0aba2dfd7f46921417a81877, pliki ofl/ibmplexmono/IBMPlexMono-Regular.ttf
   (sha256 6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46) i IBMPlexMono-Medium.ttf
   (sha256 a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755), wersja 2.3.
-  Zmiany: podzbiór 140 znaków (ten sam zakres), cechy ccmp, dnom, frac, numr, mark, hinting TrueType ze źródła, format WOFF2; nazwa kroju
+  Zmiany: podzbiór 143 znaków (ten sam zakres), cechy ccmp, dnom, frac, numr, mark, hinting TrueType ze źródła, format WOFF2; nazwa kroju
   zmieniona na „INSAI Mono”.
 
 Licencja
@@ -41,7 +41,13 @@ Zgodność z dotychczasowym wyglądem
   serwował stronie dla Windows i Linuxa (dla macOS, iOS i Androida Google podawał ten sam krój bez hintingu).
   Wyjątek z 30.09.2026: znaki „=” (adresy łączy w wydruku) i „©” (wiersz praw w stopce) nie należały do podzbioru
   i rysował je krój zapasowy; od tej wersji rysują je kroje strony. Glify i szerokości pozostałych znaków bez zmian.
+  Wyjątek z 28.10.2026: znaki „‘” (U+2018), „’” (U+2019) i „“” (U+201C) z tekstów wersji angielskiej należą od tej
+  wersji do podzbioru. Kontury (także rozłożone złożenia, w Source Serif 4 w pięciu punktach osi), szerokości
+  i instrukcje hintingu 148 i 140 dotychczasowych znaków są równe plikom z 30.09.2026; tabele fpgm, prep, cvt, gasp,
+  OS/2 i name bez zmian. Rozmiary przed i po: 87496 -> 87568 B, 10252 -> 10304 B, 10460 -> 10524 B.
 
 Odtworzenie
-  Skrypt kroje.py w katalogu narzędzi repozytorium (fontTools 4.61.1 z brotli) pobiera źródła z podanych commitów,
-  sprawdza ich sha256 i zapisuje te trzy pliki WOFF2 bajt w bajt.
+  Skrypt kroje.py w katalogu narzędzi repozytorium pobiera źródła z podanych commitów, sprawdza ich sha256 i zapisuje
+  te trzy pliki WOFF2 bajt w bajt przy fontTools 4.61.0 i brotli 1.2.0 (Linux, 28.10.2026). Pliki z 30.09.2026 powstały
+  przy fontTools 4.61.1; ten sam zakres przy 4.61.0 daje tabele GSUB i GPOS o tej samej treści (zapis XML bez różnic)
+  w innym ułożeniu bajtów, a w tabeli head inną sumę kontrolną.
